@@ -1,7 +1,35 @@
 const express = require('express');
+const fs = require('fs');
 const app = express();
 
+// Load used keys from file
 let usedKeys = new Set();
+try {
+    const data = fs.readFileSync('used-keys.json', 'utf8');
+    usedKeys = new Set(JSON.parse(data));
+} catch (e) {
+    // File doesn't exist yet
+}
+
+function saveUsedKeys() {
+    fs.writeFileSync('used-keys.json', JSON.stringify([...usedKeys]));
+}
+
+// Clean old keys every hour
+setInterval(() => {
+    const now = Date.now();
+    const newUsedKeys = new Set();
+    
+    for (const key of usedKeys) {
+        const keyTime = parseInt(key.split('-')[1]);
+        if (now - keyTime < 90 * 60 * 1000) { // 1.5 hours
+            newUsedKeys.add(key);
+        }
+    }
+    
+    usedKeys = newUsedKeys;
+    saveUsedKeys();
+}, 60 * 60 * 1000);
 
 app.get('/', (req, res) => {
   const referrer = req.get('Referrer');
@@ -28,6 +56,7 @@ app.get('/', (req, res) => {
   }
   
   usedKeys.add(key);
+  saveUsedKeys();
 
   res.send(`
     <html>
